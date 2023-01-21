@@ -122,3 +122,4 @@ if __name__ == "__main__":
         general_promedios.append(promedios)
         # Imprime un salto de línea
         print("\n")
+    print(general_promedios)

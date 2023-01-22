@@ -5,10 +5,16 @@ from sqlalchemy import create_engine
 from Database import crear_base_de_datos
 
 # Función para imprimir estadísticas
-def mostrar_stadisticas(estadisticas):
+def mostrar_stadisticas(estadisticas: dict):
+    """Imprime en pantalla las estadisticas actuales de los registros que han sido insertados en la base de datos.
+    En particular tiene en cuenta los valores mínimo, máximo, promedio y número de registros de la columna precio de la tabla Compras.
+
+    Args:
+        estadisticas (dict): diccionario que contiene las estadisticas
+    """
     print(
         "Estadísticas: N° de registros: {}, Promedio: {}, Mínimo: {}, Máximo: {}".format(
-            estadisticas["conteo"],
+            estadisticas["registros"],
             estadisticas["promedio"],
             estadisticas["minimo"],
             estadisticas["maximo"],
@@ -17,6 +23,18 @@ def mostrar_stadisticas(estadisticas):
 
 
 def extraer_datos_de_csv(archivo_csv):
+    """Permite extraer la información contenida dentro del archivo csv pasado como argumento.
+    Luego, da formato de float a la columna price y int a la columna user_id del archivo csv.
+    En caso de encontrar un valor vacio en la columna price, la función asigna None a dicho valor.
+
+    Args:
+        archivo_csv (.csv): archivo csv que contiene la información
+
+    Returns:
+        fechas (list): lista que contiene las fechas encontradas en el archivo csv
+        precios (list): lista que contiene los precios encontradas en el archivo csv
+        ids(list): lista que contiene los encontrados en el archivo csv
+    """
     # Listas para almacenar los datos
     fechas = []
     precios = []
@@ -44,14 +62,18 @@ def extraer_datos_de_csv(archivo_csv):
 
 
 def enviar_a_sql(engine, df, batch_size, estadisticas):
+    """Toma un Dataframe de pandas (df) y lo envía a la base de datos pasada como argumento en la variable engine,
+    en baches del tamaño batch_size y guarda el promedio, mínimo, máximo de la columna precios en la variable estadisticas.
+
+    Args:
+        engine (sqlalchemy.engine.base.Engine): controlador de base de datos
+        df (pd.Dataframe): Dataframe con el conjunto de información organizada
+        batch_size (int): Tamaño del bache de datos a ingestar
+        estadisticas (dict): diccionario que contiene las estadisticas
+    """
 
     # Función para calcular el promedio acumulado
-    promedios = []
-    calc_cum_promedio = (
-        lambda anterior_prom, prom: (anterior_prom + prom) / 2
-        if anterior_prom is not None
-        else prom
-    )
+    calc_cum_promedio = lambda x: x["suma_acumulada"] / x["registros_no_nulos"]
     # Función para calcular el mínimo acumulado
     calc_cum_min = (
         lambda anterior_min, min_: min_ if min_ < anterior_min else anterior_min
@@ -73,11 +95,10 @@ def enviar_a_sql(engine, df, batch_size, estadisticas):
             batch_count += 1
 
             # Actualizar estadisticas
-            estadisticas["conteo"] += batch.fecha.count()
-            promedios.append(batch.precio.mean())
-            estadisticas["promedio"] = calc_cum_promedio(
-                estadisticas["promedio"], batch.precio.mean()
-            )
+            estadisticas["registros"] += batch.fecha.count()
+            estadisticas["suma_acumulada"] += batch.precio.sum()
+            estadisticas["registros_no_nulos"] += batch.precio.count()
+            estadisticas["promedio"] = calc_cum_promedio(estadisticas)
             estadisticas["minimo"] = calc_cum_min(
                 estadisticas["minimo"], batch.precio.min()
             )
@@ -90,7 +111,6 @@ def enviar_a_sql(engine, df, batch_size, estadisticas):
         except Exception as e:
             print("Error al guardar la información en la base de datos:")
             print(e.args)
-    return promedios
 
 
 if __name__ == "__main__":
@@ -102,12 +122,14 @@ if __name__ == "__main__":
     archivo_de_validacion = lista_de_archivos.pop()
 
     estadisticas = {
-        "conteo": 0,
+        "registros_no_nulos": 0,
+        "suma_acumulada": 0,
+        "registros": 0,
         "promedio": None,
         "minimo": 100,
         "maximo": 0,
     }
-    general_promedios = []
+
     for archivo_csv in lista_de_archivos:
         print("Cargando información de archivo", archivo_csv)
         fechas, precios, ids = extraer_datos_de_csv(archivo_csv)
@@ -118,8 +140,6 @@ if __name__ == "__main__":
 
         # Ajustar el tamaño del lote (batch size)
         batch_size = 5
-        promedios = enviar_a_sql(engine, df, batch_size, estadisticas)
-        general_promedios.append(promedios)
+        enviar_a_sql(engine, df, batch_size, estadisticas)
         # Imprime un salto de línea
         print("\n")
-    print(general_promedios)

@@ -21,4 +21,5 @@ def crear_base_de_datos(engine):
 
 if __name__ == "__main__":
     engine = create_engine("sqlite:///Pragma.db")
+    print(type(engine))
     crear_base_de_datos(engine)

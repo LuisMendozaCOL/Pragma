@@ -1,0 +1,14 @@
+Puntos a mejorar:
+
+1. Estandar para mejorar la escritura de código:
+	A. General: Solid
+	B. PEP 8: para Python.
+2. Especializarce en una herramienta cloud:
+	A. AWS
+	B. Azure
+	C. GCP
+3. Profundizar en los conceptos de BigData:
+	A. Datawarehouse
+	B. DataMart
+	C. Datalake
+	D. Volumetría, Streaming, Estructuras de datos.
